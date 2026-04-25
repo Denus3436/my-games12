@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pac-man</title>
+<style>
+canvas {
+    border: 1px solid black;
+    background-color: lightgrey;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const cellSize = 40;
+const rows = 10;
+const cols = 10;
+
+const maze = [
+[1,1,1,1,1,1,1,1,1,1],
+[1,0,0,0,0,0,0,0,0,0,0],
+[1,0,1,1,0,1,1,1,0,1],
+[1,0,0,1,0,0,0,0,0,1],
+[1,0,1,1,1,0,1,1,0,1],
+[1,0,0,0,1,0,0,0,0,1],
+[1,0,1,0,1,1,1,0,1,1],
+[1,0,0,0,1,1,0,0,1,1],
+[1,1,1,0,0,0,0,1,0,1],
+[1,1,1,1,1,1,1,1,1,1],
+];
+
+let pacman = {
+x: 1 * cellSize + cellSize / 2,
+y: 1 * cellSize + cellSize / 2,
+radius: 15,
+direction: "right",
+speed: cellSize,
+boost: false
+};
+
+let fruits = [];
+var score = 0;
+
+// 🔥 FIX РЕКОРДУ (СТАБІЛЬНИЙ)
+var record = Number(localStorage.getItem("record")) || 0;
+
+var drawScore = function () {
+ctx.font = "20px Courier";
+ctx.fillStyle = "white";
+ctx.textAlign = "left";
+ctx.textBaseline = "top";
+ctx.fillText("Score: " + score, 0, 0);
+ctx.fillText("Record: " + record, 0, cellSize/2);
+};
+
+// spawn fruits
+setInterval(() => {
+let row, col;
+do {
+row = Math.floor(Math.random() * rows);
+col = Math.floor(Math.random() * cols);
+} while (maze[row][col] !== 0);
+
+fruits.push({
+x: col * cellSize + cellSize / 2,
+y: row * cellSize + cellSize / 2
+});
+}, 5000);
+
+// 🔥 FIX РЕКОРДУ
+function updateRecord() {
+if (score > record) {
+record = score;
+localStorage.setItem("record", String(record));
+}
+}
+
+function drawMaze() {
+for (let row = 0; row < rows; row++) {
+for (let col = 0; col < cols; col++) {
+if (maze[row][col] === 1) {
+ctx.fillStyle = "blue";
+ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+}
+}
+}
+}
+
+function drawPacman() {
+ctx.beginPath();
+
+let startAngle = 0.25 * Math.PI;
+let endAngle = 1.75 * Math.PI;
+
+if (pacman.direction === "left") {
+startAngle = Math.PI + 0.25 * Math.PI;
+endAngle = Math.PI + 1.75 * Math.PI;
+}
+
+ctx.arc(pacman.x, pacman.y, pacman.radius, startAngle, endAngle);
+ctx.lineTo(pacman.x, pacman.y);
+
+ctx.fillStyle = pacman.boost ? "orange" : "yellow";
+ctx.fill();
+ctx.closePath();
+
+const eyeX = pacman.direction === "left" ? pacman.x + 5 : pacman.x - 5;
+const eyeY = pacman.y - 5;
+
+ctx.beginPath();
+ctx.arc(eyeX, eyeY, 3, 0, 2 * Math.PI);
+ctx.fillStyle = "black";
+ctx.fill();
+}
+
+function drawFruits() {
+fruits.forEach(f => {
+ctx.beginPath();
+ctx.arc(f.x, f.y, 6, 0, 2*Math.PI);
+ctx.fillStyle = "green";
+ctx.fill();
+});
+}
+
+function checkFruit() {
+fruits = fruits.filter(f => {
+let d = Math.hypot(pacman.x - f.x, pacman.y - f.y);
+
+if (d < 20) {
+score += 10;
+
+// буст
+pacman.speed = cellSize * 2;
+pacman.boost = true;
+
+setTimeout(() => {
+pacman.speed = cellSize;
+pacman.boost = false;
+}, 3000);
+
+updateRecord(); // 🔥 FIX — тепер рекорд не лагає
+
+return false;
+}
+return true;
+});
+}
+
+function isValidMove(newX, newY) {
+const gridX = Math.floor(newX / cellSize);
+const gridY = Math.floor(newY / cellSize);
+return maze[gridY] && maze[gridY][gridX] === 0;
+}
+
+function update() {
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+drawMaze();
+drawPacman();
+drawFruits();
+drawScore();
+
+let newX = pacman.x;
+let newY = pacman.y;
+
+if (pacman.direction === "right") newX += pacman.speed;
+if (pacman.direction === "left") newX -= pacman.speed;
+if (pacman.direction === "up") newY -= pacman.speed;
+if (pacman.direction === "down") newY += pacman.speed;
+
+if (isValidMove(newX, newY)) {
+pacman.x = newX;
+pacman.y = newY;
+}
+
+let gridX = Math.floor(pacman.x / cellSize);
+let gridY = Math.floor(pacman.y / cellSize);
+
+if (gridY === 1 && gridX === 10) {
+let randRow, randCol;
+
+do {
+randRow = Math.floor(Math.random() * rows);
+randCol = Math.floor(Math.random() * cols);
+} while (maze[randRow][randCol] !== 0);
+
+pacman.x = randCol * cellSize + cellSize / 2;
+pacman.y = randRow * cellSize + cellSize / 2;
+
+updateRecord();
+
+if (Math.floor(Math.random()*11) == 10) {
+gameOver();
+}
+}
+
+checkFruit();
+}
+
+var gameOver = function () {
+updateRecord();
+clearInterval(intervalId);
+
+ctx.font = "60px Courier";
+ctx.fillStyle = "Black";
+ctx.textAlign = "center";
+ctx.textBaseline = "middle";
+ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+};
+
+document.addEventListener("keydown", function (event) {
+if (event.key === "ArrowRight") pacman.direction = "right";
+if (event.key === "ArrowLeft") pacman.direction = "left";
+if (event.key === "ArrowUp") pacman.direction = "up";
+if (event.key === "ArrowDown") pacman.direction = "down";
+});
+
+var intervalId = setInterval(update, 200);
+</script>
+
+</body>
+</html>
